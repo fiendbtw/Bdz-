@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Графоаналитический метод – Вариант 29</title>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 850px;
+            margin: 2cm auto;
+            padding: 0 1.5cm;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .explanation {
+            text-align: left;
+            background: #f0f4ff;
+            border-left: 5px solid #1976d2;
+            padding: 1em 1.5em;
+            margin: 1em 0;
+            border-radius: 6px;
+        }
+        .result-box {
+            background: #e8f5e9;
+            border-left: 5px solid #2e7d32;
+            padding: 1em 1.5em;
+            margin: 1em 0;
+            border-radius: 6px;
+            text-align: left;
+        }
+        canvas { 
+            max-width: 100%; 
+            margin: 1.5em 0;
+            cursor: grab;
+        }
+        canvas:active { cursor: grabbing; }
+        .optimal {
+            font-weight: bold;
+            background: #c8e6c9;
+            padding: 0.2em 0.5em;
+            border-radius: 4px;
+        }
+        .btn-reset {
+            display: inline-block;
+            margin: 0.5em 0 1em 0;
+            padding: 0.5em 1.5em;
+            font-size: 14px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-reset:hover { background: #1565c0; }
+    </style>
+</head>
+<body>
+    <h2>Графоаналитический метод – нахождение оптимальной смешанной стратегии</h2>
+
+    <div class="explanation">
+        <p><strong>Что показывают линии:</strong></p>
+        <p><span style="color:#d32f2f;">▬ <strong>Красная линия</strong></span> – выигрыш пентестеров, если защита всегда использует стратегию <strong>B₂ (антифишинговый тренинг)</strong>. Уравнение: v = 13 + 15p</p>
+        <p><span style="color:#1976d2;">▬ <strong>Синяя линия</strong></span> – выигрыш, если защита всегда выбирает <strong>B₃ (обновление WAF)</strong>. Уравнение: v = 22 − 9p</p>
+        <p><span style="color:#388e3c;">▬ <strong>Зелёная ломаная</strong></span> – <strong>нижняя огибающая</strong>: гарантированный выигрыш пентестеров при наихудших действиях защиты.</p>
+        <p><strong>⚫ Чёрная точка</strong> – точка пересечения красной и синей прямых (p = 0.375, v = 18.625). Это максимум нижней огибающей и решение игры.</p>
+    </div>
+
+    <button class="btn-reset" onclick="resetZoom()">Сбросить масштаб</button>
+    <canvas id="graph" width="700" height="400"></canvas>
+
+    <div class="result-box">
+        <p><strong>Результат:</strong></p>
+        <p>• <strong>Оптимальная стратегия пентестеров (A):</strong> A₁ с вероятностью <span class="optimal">3/8 (37.5%)</span>, A₂ — <span class="optimal">5/8 (62.5%)</span>.</p>
+        <p>• <strong>Оптимальная стратегия защиты (B):</strong> B₂ (тренинг) — <span class="optimal">3/8 (37.5%)</span>, B₃ (WAF) — <span class="optimal">5/8 (62.5%)</span>, B₁ — <span class="optimal">0%</span>.</p>
+        <p>• <strong>Цена игры:</strong> <span class="optimal">v = 149/8 = 18.625 флагов</span> (средний выигрыш при оптимальной игре обеих сторон).</p>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('graph').getContext('2d');
+
+        const points = Array.from({length: 101}, (_, i) => i / 100);
+        const vB2 = points.map(p => 13 + 15 * p);
+        const vB3 = points.map(p => 22 - 9 * p);
+        const lower = points.map((p, i) => Math.min(vB2[i], vB3[i]));
+
+        const pOpt = 0.375;
+        const vOpt = 18.625;
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: points.map(p => p.toFixed(2)),
+                datasets: [
+                    {
+                        label: 'B₂ (тренинг): v = 13 + 15p',
+                        data: vB2,
+                        borderColor: '#d32f2f',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'B₃ (WAF): v = 22 − 9p',
+                        data: vB3,
+                        borderColor: '#1976d2',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Нижняя огибающая',
+                        data: lower,
+                        borderColor: '#388e3c',
+                        borderWidth: 3,
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        tension: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Оптимальная точка (p=0.375, v=18.625)',
+                        type: 'scatter',
+                        data: [{x: pOpt, y: vOpt}],
+                        backgroundColor: '#000000',
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        pointRadius: 8,
+                        pointHoverRadius: 10,
+                        showLine: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 20, font: { size: 13 } }
+                    },
+                    zoom: {
+                        zoom: {
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'xy',
+                            drag: false
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'xy',
+                            modifierKey: null
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: { display: true, text: 'Вероятность p (выбор A₁)', font: { size: 14, weight: 'bold' } },
+                        min: 0,
+                        max: 1,
+                        ticks: { stepSize: 0.1 }
+                    },
+                    y: {
+                        title: { display: true, text: 'Ожидаемый выигрыш A (флаги)', font: { size: 14, weight: 'bold' } },
+                        min: 10,
+                        max: 30,
+                        ticks: { stepSize: 2 }
+                    }
+                }
+            }
+        });
+
+        function resetZoom() {
+            chart.resetZoom();
+        }
+    </script>
+</body>
+</html>
